@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import ProductCard from './ProductCard';
 import { useProductsCache } from '../context/ProductContext';
 import './ProductList.css';
+import Home from './Home';  // ← add this import
 
 const ProductList = ({ onAddToCart }) => {
   const { cachedList, cacheProductList } = useProductsCache();
@@ -41,6 +42,8 @@ const ProductList = ({ onAddToCart }) => {
 
   return (
     <div className="product-list-container">
+      {/*<Home />
+      <div id="product-grid-anchor" />*/}
       <h2>Featured Products</h2>
       <div className="product-grid">
         {products.map(product => (

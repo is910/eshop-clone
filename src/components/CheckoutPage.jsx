@@ -1,15 +1,67 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import './CheckoutPage.css';
 
-const CheckoutPage = ({ cartItems, onCheckoutSuccess }) => {
+const ArrowLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12 19 5 12 12 5"/>
+  </svg>
+);
+
+const LockIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0110 0v4"/>
+  </svg>
+);
+
+const TruckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="3" width="15" height="13"/>
+    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+    <circle cx="5.5" cy="18.5" r="2.5"/>
+    <circle cx="18.5" cy="18.5" r="2.5"/>
+  </svg>
+);
+
+const CheckCircle = () => (
+  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+    <polyline points="22 4 12 14.01 9 11.01"/>
+  </svg>
+);
+
+const AlertIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+
+const CheckoutPage = () => {
+  const { cartItems, cartTotal, clearCart } = useCart();
   const [shipping, setShipping] = useState({ fullName: '', address: '', phone: '' });
   const [orderReceipt, setOrderReceipt] = useState(null);
   const [error, setError] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleInputChange = (e) => setShipping({ ...shipping, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setShipping(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    if (error) setError(null);
+  };
 
-  const handlePlaceOrder = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setIsSubmitting(true);
 
     const token = localStorage.getItem('authToken');
     const guestId = localStorage.getItem('guestId');
@@ -17,94 +69,218 @@ const CheckoutPage = ({ cartItems, onCheckoutSuccess }) => {
     try {
       const res = await fetch('http://localhost:5000/api/orders/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': token || '' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: token } : {}),
+        },
         body: JSON.stringify({
           fullName: shipping.fullName,
           shippingAddress: shipping.address,
           contactPhone: shipping.phone,
-          guestId: token ? null : guestId
-        })
+          guestId: token ? null : guestId,
+        }),
       });
 
       const data = await res.json();
 
       if (res.ok) {
         setOrderReceipt(data);
-        onCheckoutSuccess(); // Clear cart visibility in parent layout
+        clearCart();
       } else {
-        setError(data.error || "Order execution failed.");
+        setError(data.error || 'Order execution failed.');
       }
     } catch (err) {
-      setError("Cannot sync with checkout transaction node.");
+      setError('Cannot sync with checkout transaction node.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const cartTotal = cartItems.reduce((acc, item) => acc + (item.price * (item.quantity || 1)), 0);
-
+  /* ── Success State ───────────────────────── */
   if (orderReceipt) {
     return (
-      <div style={{ maxWidth: '600px', margin: '4rem auto', padding: '2rem', border: '1px solid #28a745', borderRadius: '8px', textAlign: 'center', background: '#f8fff9' }}>
-        <h2 style={{ color: '#28a745' }}>🎉 Order Placed Successfully!</h2>
-        <p style={{ fontSize: '1.2rem', margin: '1rem 0' }}>Thank you for your purchase.</p>
-        <div style={{ background: '#fff', padding: '1rem', borderRadius: '4px', border: '1px solid #ddd', textAlign: 'left', margin: '1.5rem 0' }}>
-          <p><strong>Order ID Reference:</strong> #{orderReceipt.orderId}</p>
-          <p><strong>Total Charged amount:</strong> ${orderReceipt.total.toFixed(2)}</p>
-          <p>Status: <span style={{ color: '#007bff', fontWeight: 'bold' }}>Processing Inventory Packing</span></p>
+      <div className="checkout">
+        <div className="checkout__success animate-bounce-in">
+          <div className="checkout__success-icon">
+            <CheckCircle />
+          </div>
+          <h1 className="checkout__success-title">Order Placed</h1>
+          <p className="checkout__success-sub">
+            Thank you for your purchase! Your order has been received and is being processed.
+          </p>
+
+          <div className="checkout__success-card">
+            <div className="checkout__success-row">
+              <span className="checkout__success-label">Order Reference</span>
+              <span className="checkout__success-value">#{orderReceipt.orderId}</span>
+            </div>
+            <div className="checkout__success-row">
+              <span className="checkout__success-label">Total Charged</span>
+              <span className="checkout__success-value checkout__success-value--price">
+                ${orderReceipt.total.toFixed(2)}
+              </span>
+            </div>
+            <div className="checkout__success-row">
+              <span className="checkout__success-label">Status</span>
+              <span className="checkout__success-status">
+                <span className="checkout__success-dot" />
+                Processing
+              </span>
+            </div>
+          </div>
+
+          <Link to="/" className="checkout__success-btn">
+            Return to Storefront
+          </Link>
         </div>
-        <button onClick={() => window.location.href = '/'} style={{ padding: '0.5rem 1rem', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Return to Storefront</button>
       </div>
     );
   }
 
-  return (
-    <div style={{ maxWidth: '900px', margin: '2rem auto', padding: '1rem', display: 'grid', gridTemplateColumns: cartItems.length > 0 ? '1fr 1fr' : '1fr', gap: '2rem' }}>
-      <div>
-        <h2>Checkout Details</h2>
-        {error && <div style={{ color: 'red', margin: '1rem 0', fontWeight: 'bold' }}>{error}</div>}
-        
-        {cartItems.length === 0 ? (
-          <p>Your cart is empty. Add products to configure checkout routines.</p>
-        ) : (
-          <form onSubmit={handlePlaceOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>Full Name</label>
-              <input type="text" name="fullName" value={shipping.fullName} onChange={handleInputChange} required style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>Shipping Address</label>
-              <input type="text" name="address" value={shipping.address} onChange={handleInputChange} required style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>Contact Phone</label>
-              <input type="text" name="phone" value={shipping.phone} onChange={handleInputChange} required style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }} />
-            </div>
-            <button type="submit" style={{ padding: '0.75rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}>
-              Confirm & Pay ${cartTotal.toFixed(2)}
-            </button>
-          </form>
-        )}
-      </div>
-
-      {cartItems.length > 0 && (
-        <div style={{ background: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', border: '1px solid #eee' }}>
-          <h3>Order Summary</h3>
-          <div style={{ margin: '1rem 0', maxHeight: '300px', overflowY: 'auto' }}>
-            {cartItems.map((item, index) => (
-              <div key={index} style={{ display: 'flex', gap: '10px', padding: '0.5rem 0', borderBottom: '1px solid #ddd', alignItems: 'center' }}>
-                <img src={item.image} alt={item.name} style={{ width: '50px', height: '50px', objectFit: 'cover', borderRadius: '4px' }} />
-                <div style={{ flex: 1 }}>
-                  <h4 style={{ margin: 0 }}>{item.name}</h4>
-                  <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>Qty: {item.quantity || 1} &times; ${item.price.toFixed(2)}</p>
-                </div>
-              </div>
-            ))}
+  /* ── Empty Cart Redirect ─────────────────── */
+  if (cartItems.length === 0) {
+    return (
+      <div className="checkout">
+        <Link to="/" className="checkout__back">
+          <ArrowLeft />
+          <span>Back to Shop</span>
+        </Link>
+        <div className="empty-state">
+          <div className="empty-state__icon">
+            <TruckIcon />
           </div>
-          <h3 style={{ borderTop: '2px solid #ddd', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-            <span>Total:</span>
-            <span>${cartTotal.toFixed(2)}</span>
-          </h3>
+          <h3 className="empty-state__title">Your cart is empty</h3>
+          <p className="empty-state__description">
+            Add some products before checking out.
+          </p>
+          <Link to="/" className="cart-drawer__empty-cta">
+            Browse Products
+            <ArrowLeft style={{ transform: 'rotate(180deg)' }} />
+          </Link>
         </div>
-      )}
+      </div>
+    );
+  }
+
+  /* ── Checkout Form ───────────────────────── */
+  return (
+    <div className="checkout">
+      <Link to="/" className="checkout__back animate-fade-in-down">
+        <ArrowLeft />
+        <span>Back to Shop</span>
+      </Link>
+
+      <h1 className="checkout__title animate-fade-in-up">Checkout</h1>
+
+      <div className="checkout__grid">
+        {/* ── Form Column ─────────────────── */}
+        <form
+          className="checkout__form animate-fade-in-up delay-1"
+          onSubmit={handleSubmit}
+          noValidate
+        >
+          <h2 className="checkout__section-title">
+            <TruckIcon />
+            Shipping Details
+          </h2>
+
+          {error && (
+            <div className="checkout__error" role="alert">
+              <AlertIcon />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="checkout__field">
+            <label htmlFor="fullName">Full Name</label>
+            <input
+              id="fullName"
+              type="text"
+              name="fullName"
+              value={shipping.fullName}
+              onChange={handleChange}
+              placeholder="Jane Doe"
+              required
+              autoComplete="name"
+            />
+          </div>
+
+          <div className="checkout__field">
+            <label htmlFor="address">Shipping Address</label>
+            <input
+              id="address"
+              type="text"
+              name="address"
+              value={shipping.address}
+              onChange={handleChange}
+              placeholder="123 Main St, City, Country"
+              required
+              autoComplete="street-address"
+            />
+          </div>
+
+          <div className="checkout__field">
+            <label htmlFor="phone">Contact Phone</label>
+            <input
+              id="phone"
+              type="tel"
+              name="phone"
+              value={shipping.phone}
+              onChange={handleChange}
+              placeholder="+1 (555) 123-4567"
+              required
+              autoComplete="tel"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="checkout__submit-btn"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <span className="checkout__spinner" />
+                Processing…
+              </>
+            ) : (
+              <>
+                <LockIcon />
+                Confirm & Pay ${cartTotal.toFixed(2)}
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* ── Summary Column ─────────────── */}
+        <div className="checkout__summary animate-fade-in-up delay-2">
+          <h2 className="checkout__section-title">Order Summary</h2>
+
+          <ul className="checkout__summary-list">
+            {cartItems.map(item => (
+              <li key={item.id} className="checkout__summary-item">
+                <Link to={`/product/${item.id}`} className="checkout__summary-img">
+                  <img src={item.image} alt={item.name} />
+                </Link>
+                <div className="checkout__summary-info">
+                  <span className="checkout__summary-name">{item.name}</span>
+                  <span className="checkout__summary-qty">
+                    Qty {item.quantity || 1} &times; ${item.price.toFixed(2)}
+                  </span>
+                </div>
+                <span className="checkout__summary-line">
+                  ${(item.price * (item.quantity || 1)).toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="checkout__summary-total">
+            <span>Total</span>
+            <span>${cartTotal.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
