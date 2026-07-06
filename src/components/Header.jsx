@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import './Header.css';
 
-/* ── Inline SVG Icons ─────────────────────────────────── */
 const CartIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -53,22 +52,39 @@ const ShieldIcon = () => (
   </svg>
 );
 
+const ChevronDown = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
 
-const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
+const GridIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7"/>
+    <rect x="14" y="3" width="7" height="7"/>
+    <rect x="3" y="14" width="7" height="7"/>
+    <rect x="14" y="14" width="7" height="7"/>
+  </svg>
+);
+
+const Header = ({
+  cartItemCount, onCartClick, userRole, onLogout,
+  categories = [], selectedCategory, onSelectCategory
+}) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [cartBounce, setCartBounce] = useState(false);
   const location = useLocation();
   const prevCountRef = useRef(cartItemCount);
 
-  /* Scroll detection for header style shift */
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 12);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  /* Bounce the cart badge when count changes */
   useEffect(() => {
     if (cartItemCount > prevCountRef.current) {
       setCartBounce(true);
@@ -78,12 +94,8 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
     prevCountRef.current = cartItemCount;
   }, [cartItemCount]);
 
-  /* Close mobile menu on route change */
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
+  useEffect(() => { setIsMobileMenuOpen(false); }, [location.pathname]);
 
-  /* Lock body scroll when mobile menu is open */
   useEffect(() => {
     document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
@@ -94,30 +106,78 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
     setIsMobileMenuOpen(false);
   };
 
+  const handleCategoryClick = (cat) => {
+    onSelectCategory(cat === 'All' ? null : cat);
+    setIsMobileMenuOpen(false);
+  };
+
+  const handleShopClick = () => {
+    onSelectCategory(null);
+    setIsMobileMenuOpen(false);
+  };
+
   const displayCount = cartItemCount > 99 ? '99+' : cartItemCount;
+
+  const showCategoriesDropdown = categories.length > 0;
 
   return (
     <>
       <header className={`header ${isScrolled ? 'header--scrolled' : ''}`}>
         <div className="header__inner">
 
-          {/* ── Logo ──────────────────────────────── */}
           <Link to="/" className="header__logo" aria-label="Home">
             <span className="header__logo-mark">V</span>
             <span className="header__logo-text">Verdant</span>
           </Link>
 
-          {/* ── Desktop Navigation ────────────────── */}
           <nav className="header__nav" aria-label="Main navigation">
             <ul className="header__nav-list">
               <li>
                 <Link
                   to="/"
-                  className={`header__nav-link ${location.pathname === '/' ? 'header__nav-link--active' : ''}`}
+                  className={`header__nav-link ${location.pathname === '/' && !selectedCategory ? 'header__nav-link--active' : ''}`}
+                  onClick={handleShopClick}
                 >
                   Shop
                 </Link>
               </li>
+
+              {showCategoriesDropdown && (
+                <li className="header__cat-wrap">
+                  <span
+                    className={`header__nav-link header__nav-link--cat ${selectedCategory ? 'header__nav-link--active' : ''}`}
+                  >
+                    Categories
+                    <ChevronDown />
+                  </span>
+
+                  <div className="header__cat-dropdown" aria-label="Product categories">
+                    <div className="header__cat-dropdown-arrow" aria-hidden="true" />
+                    <div className="header__cat-dropdown-inner">
+                      <button
+                        className={`header__cat-item ${!selectedCategory ? 'header__cat-item--active' : ''}`}
+                        onClick={() => handleCategoryClick('All')}
+                      >
+                        <GridIcon />
+                        <span>All Products</span>
+                      </button>
+
+                      <div className="header__cat-divider" />
+
+                      {categories.map(cat => (
+                        <button
+                          key={cat}
+                          className={`header__cat-item ${selectedCategory === cat ? 'header__cat-item--active' : ''}`}
+                          onClick={() => handleCategoryClick(cat)}
+                        >
+                          <span className="header__cat-dot" />
+                          <span>{cat}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </li>
+              )}
 
               {userRole === 'admin' && (
                 <li>
@@ -133,10 +193,7 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
             </ul>
           </nav>
 
-          {/* ── Right Actions ─────────────────────── */}
           <div className="header__actions">
-
-            {/* Auth state */}
             {userRole === 'guest' ? (
               <Link to="/auth" className="header__auth-btn">
                 <UserIcon />
@@ -159,7 +216,6 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
               </div>
             )}
 
-            {/* Cart trigger */}
             <button
               className={`header__cart-btn ${cartBounce ? 'header__cart-btn--bounce' : ''}`}
               onClick={handleCartClick}
@@ -173,7 +229,6 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
               )}
             </button>
 
-            {/* Mobile hamburger */}
             <button
               className="header__menu-toggle"
               onClick={() => setIsMobileMenuOpen(prev => !prev)}
@@ -186,14 +241,12 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
         </div>
       </header>
 
-      {/* ── Mobile Drawer Overlay ─────────────────── */}
       <div
         className={`header__overlay ${isMobileMenuOpen ? 'header__overlay--visible' : ''}`}
         onClick={() => setIsMobileMenuOpen(false)}
         aria-hidden="true"
       />
 
-      {/* ── Mobile Drawer ─────────────────────────── */}
       <aside
         className={`header__drawer ${isMobileMenuOpen ? 'header__drawer--open' : ''}`}
         aria-label="Mobile navigation"
@@ -206,11 +259,37 @@ const Header = ({ cartItemCount, onCartClick, userRole, onLogout }) => {
         <nav className="header__drawer-nav">
           <Link
             to="/"
-            className={`header__drawer-link ${location.pathname === '/' ? 'header__drawer-link--active' : ''}`}
-            onClick={() => setIsMobileMenuOpen(false)}
+            className={`header__drawer-link ${location.pathname === '/' && !selectedCategory ? 'header__drawer-link--active' : ''}`}
+            onClick={handleShopClick}
           >
             Shop
           </Link>
+
+          {showCategoriesDropdown && (
+            <>
+              <div className="header__drawer-divider" />
+              <span className="header__drawer-section-title">Categories</span>
+              <Link
+                to="/"
+                className={`header__drawer-link header__drawer-link--cat ${!selectedCategory ? 'header__drawer-link--active' : ''}`}
+                onClick={() => handleCategoryClick('All')}
+              >
+                <GridIcon />
+                All Products
+              </Link>
+              {categories.map(cat => (
+                <Link
+                  key={cat}
+                  to="/"
+                  className={`header__drawer-link header__drawer-link--cat ${selectedCategory === cat ? 'header__drawer-link--active' : ''}`}
+                  onClick={() => handleCategoryClick(cat)}
+                >
+                  <span className="header__cat-dot" />
+                  {cat}
+                </Link>
+              ))}
+            </>
+          )}
 
           {userRole === 'admin' && (
             <Link
