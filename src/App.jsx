@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useCart } from './context/CartContext';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -13,10 +13,24 @@ import Cart from './components/Cart';
 import CheckoutPage from './components/CheckoutPage';
 
 function App() {
-  const { cartItems, isCartOpen, openCart, closeCart, addToCart, fetchCart, clearCart, cartCount } = useCart();
+  const { isCartOpen, openCart, closeCart, addToCart, fetchCart, clearCart, cartCount } = useCart();
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || null);
   const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || 'guest');
   const [guestId, setGuestId] = useState(localStorage.getItem('guestId') || null);
+
+  /* ── Category state (shared between Header & ProductList) ── */
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [headerCategories, setHeaderCategories] = useState([]);
+
+  useEffect(() => {
+    fetch('http://localhost:5000/api/products')
+      .then(res => res.json())
+      .then(data => {
+        const cats = [...new Set(data.map(p => p.category))];
+        setHeaderCategories(cats);
+      })
+      .catch(() => {});
+  }, []);
 
   const ensureGuestId = useCallback(() => {
     if (!authToken && !guestId) {
@@ -63,11 +77,23 @@ function App() {
         onCartClick={openCart}
         userRole={userRole}
         onLogout={handleLogout}
+        categories={headerCategories}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
       />
 
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<ProductList onAddToCart={addToCart} />} />
+          <Route
+            path="/"
+            element={
+              <ProductList
+                onAddToCart={addToCart}
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+              />
+            }
+          />
           <Route path="/product/:id" element={<ProductDetails onAddToCart={addToCart} />} />
           <Route path="/auth" element={<AuthPage onAuthSuccess={handleAuthCompletion} />} />
           <Route path="/checkout" element={<CheckoutPage />} />

@@ -19,6 +19,14 @@ const XIcon = () => (
   </svg>
 );
 
+const ArrowLeft = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12 19 5 12 12 5"/>
+  </svg>
+);
+
 const EmptySearchIcon = () => (
   <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
@@ -45,19 +53,17 @@ const SORT_OPTIONS = [
   { value: 'name-desc', label: 'Z → A' },
 ];
 
-const ProductList = ({ onAddToCart }) => {
+const ProductList = ({ onAddToCart, selectedCategory, onSelectCategory }) => {
   const { cachedList, cacheProductList } = useProductsCache();
   const [products, setProducts] = useState(cachedList || []);
   const [isLoading, setIsLoading] = useState(!cachedList);
   const [error, setError] = useState(null);
 
-  /* ── Search, filter & sort state ───────── */
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [sortBy, setSortBy] = useState('default');
   const inputRef = useRef(null);
 
-  /* ── Fetch products ─────────────────────── */
   useEffect(() => {
     if (cachedList) return;
 
@@ -88,7 +94,12 @@ const ProductList = ({ onAddToCart }) => {
   const displayProducts = useMemo(() => {
     let result = products;
 
-    // Text search (name + category)
+    // Header category filter (first layer)
+    if (selectedCategory) {
+      result = result.filter(p => p.category === selectedCategory);
+    }
+
+    // Text search (within the category)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter(p =>
@@ -136,16 +147,20 @@ const ProductList = ({ onAddToCart }) => {
     }
 
     return result;
-  }, [products, searchQuery, activeFilter, sortBy]);
+  }, [products, selectedCategory, searchQuery, activeFilter, sortBy]);
 
   const handleClearSearch = () => {
     setSearchQuery('');
     inputRef.current?.focus();
   };
 
+  const handleClearCategory = () => {
+    onSelectCategory(null);
+  };
+
   const isSearching = searchQuery.trim().length > 0;
   const isFiltered = activeFilter !== 'all';
-  const isModified = isSearching || isFiltered || sortBy !== 'default';
+  const isModified = isSearching || isFiltered || sortBy !== 'default' || !!selectedCategory;
 
   /* ── Loading ────────────────────────────── */
   if (isLoading) {
@@ -199,19 +214,45 @@ const ProductList = ({ onAddToCart }) => {
     );
   }
 
+  /* ── Build section title ────────────────── */
+  const sectionTitle = isSearching
+    ? selectedCategory
+      ? <>Results for &ldquo;{searchQuery}&rdquo; in <span className="pl-title-cat">{selectedCategory}</span></>
+      : <>Results for &ldquo;{searchQuery}&rdquo;</>
+    : selectedCategory
+      ? selectedCategory
+      : 'Featured Products';
+
   /* ── Main Render ────────────────────────── */
   return (
     <div className="product-list-container">
-      {/* ── Toolbar: Search + Filters + Sort ── */}
+
+      {/* ── Active Category Banner ────────── */}
+      {selectedCategory && (
+        <div className="pl-active-cat animate-fade-in-down">
+          <span className="pl-active-cat__label">
+            Browsing: <strong>{selectedCategory}</strong>
+          </span>
+          <button
+            className="pl-active-cat__clear"
+            onClick={handleClearCategory}
+            aria-label={`Clear ${selectedCategory} filter`}
+          >
+            <ArrowLeft />
+            All Products
+          </button>
+        </div>
+      )}
+
+      {/* ── Toolbar ───────────────────────── */}
       <div className="pl-toolbar animate-fade-in-down">
-        {/* Search input */}
         <div className="pl-search">
           <span className="pl-search__icon"><SearchIcon /></span>
           <input
             ref={inputRef}
             type="text"
             className="pl-search__input"
-            placeholder="Search products..."
+            placeholder={selectedCategory ? `Search in ${selectedCategory}...` : 'Search products...'}
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             aria-label="Search products"
@@ -229,7 +270,6 @@ const ProductList = ({ onAddToCart }) => {
 
         <div className="pl-divider" />
 
-        {/* Filter pills */}
         <div className="pl-group">
           <span className="pl-label">Filter</span>
           <div className="pl-pills">
@@ -247,7 +287,6 @@ const ProductList = ({ onAddToCart }) => {
 
         <div className="pl-divider" />
 
-        {/* Sort pills */}
         <div className="pl-group">
           <span className="pl-label">Sort</span>
           <div className="pl-pills">
@@ -266,12 +305,7 @@ const ProductList = ({ onAddToCart }) => {
 
       {/* ── Section Header ────────────────── */}
       <div className="product-list-header animate-fade-in-up delay-1">
-        <h2>
-          {isSearching
-            ? <>Results for &ldquo;{searchQuery}&rdquo;</>
-            : 'Featured Products'
-          }
-        </h2>
+        <h2>{sectionTitle}</h2>
         <p className="product-list-count">
           {isModified
             ? `${displayProducts.length} of ${products.length} products`
@@ -291,17 +325,20 @@ const ProductList = ({ onAddToCart }) => {
               : 'No products match the selected filter. Try a different option.'
             }
           </p>
-          {(isFiltered || sortBy !== 'default') && (
+          {(selectedCategory || isFiltered || sortBy !== 'default') && (
             <button
               className="pl-reset-btn"
-              onClick={() => { setActiveFilter('all'); setSortBy('default'); }}
+              onClick={() => {
+                if (selectedCategory) handleClearCategory();
+                setActiveFilter('all');
+                setSortBy('default');
+              }}
             >
               Reset Filters
             </button>
           )}
         </div>
       ) : (
-        /* ── Product Grid ──────────────────── */
         <div className="product-grid">
           {displayProducts.map((product, index) => (
             <ProductCard
