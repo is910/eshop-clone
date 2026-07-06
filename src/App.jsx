@@ -11,14 +11,13 @@ import AdminDashboard from './components/AdminDashboard';
 import AuthPage from './components/AuthPage';
 import Cart from './components/Cart';
 import CheckoutPage from './components/CheckoutPage';
+import NotFound from './components/NotFound';
 
 function App() {
   const { isCartOpen, openCart, closeCart, addToCart, fetchCart, clearCart, cartCount } = useCart();
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || null);
   const [userRole, setUserRole] = useState(localStorage.getItem('userRole') || 'guest');
   const [guestId, setGuestId] = useState(localStorage.getItem('guestId') || null);
-
-  /* ── Category state (shared between Header & ProductList) ── */
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [headerCategories, setHeaderCategories] = useState([]);
 
@@ -105,6 +104,12 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/cart" element={<Navigate to="/" replace />} />
+          <Route path="/shop" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<Navigate to="/auth" replace />} />
+          <Route path="/register" element={<Navigate to="/auth" replace />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
 
