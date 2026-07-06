@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { COUNTRIES, getCountryFlag, getPhoneHint, getPhonePlaceholder } from '../data/countries';
 import './CheckoutPage.css';
 
 const ArrowLeft = () => (
@@ -46,16 +47,219 @@ const AlertIcon = () => (
   </svg>
 );
 
+const ChevronDown = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 12 18 9"/>
+  </svg>
+);
+
+const SearchSmallIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/>
+    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+/* ═══════════════════════════════════════════════
+   CountryPicker — Searchable Dropdown
+   ═══════════════════════════════════════════════ */
+const CountryPicker = ({ value, onChange, placeholder }) => {
+  const [query, setQuery] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const containerRef = useRef(null);
+  const inputRef = useRef(null);
+  const listRef = useRef(null);
+
+  const selected = COUNTRIES.find(c => c.code === value);
+
+  const filtered = query.trim()
+    ? COUNTRIES.filter(c =>
+        c.name.toLowerCase().includes(query.toLowerCase()) ||
+        c.code.toLowerCase().includes(query.toLowerCase())
+      )
+    : COUNTRIES;
+
+  /* Close on outside click */
+  useEffect(() => {
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  /* Scroll highlighted item into view */
+  useEffect(() => {
+    if (highlightIdx >= 0 && listRef.current) {
+      const el = listRef.current.children[highlightIdx];
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    }
+  }, [highlightIdx]);
+
+  const handleSelect = (code) => {
+    onChange(code);
+    setIsOpen(false);
+    setQuery('');
+    inputRef.current?.blur();
+  };
+
+  const handleKeyDown = (e) => {
+    if (!isOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setIsOpen(true);
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightIdx(prev => Math.min(prev + 1, filtered.length - 1));
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightIdx(prev => Math.max(prev - 1, 0));
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightIdx >= 0 && filtered[highlightIdx]) {
+          handleSelect(filtered[highlightIdx].code);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setIsOpen(false);
+        setQuery('');
+        inputRef.current?.blur();
+        break;
+      case 'Tab':
+        setIsOpen(false);
+        setQuery('');
+        break;
+    }
+  };
+
+  const displayValue = isOpen ? query : (selected ? selected.name : '');
+
+  return (
+    <div className="cp" ref={containerRef}>
+      <div className={`cp__input-wrap ${isOpen ? 'cp__input-wrap--open' : ''}`}>
+        {selected && !query && (
+          <span className="cp__flag">{getCountryFlag(selected.code)}</span>
+        )}
+        <input
+          ref={inputRef}
+          type="text"
+          className="cp__input"
+          placeholder={selected ? '' : (placeholder || 'Select country')}
+          value={displayValue}
+          onChange={e => { setQuery(e.target.value); setIsOpen(true); setHighlightIdx(-1); }}
+          onFocus={() => { setIsOpen(true); setQuery(''); }}
+          onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-label={placeholder || 'Select country'}
+        />
+        <span className={`cp__arrow ${isOpen ? 'cp__arrow--open' : ''}`} aria-hidden="true">
+          <ChevronDown />
+        </span>
+      </div>
+
+      {isOpen && (
+        <ul className="cp__list" ref={listRef} role="listbox">
+          {filtered.length > 0 ? (
+            filtered.map((c, i) => (
+              <li
+                key={c.code}
+                className={`cp__item ${i === highlightIdx ? 'cp__item--hl' : ''} ${c.code === value ? 'cp__item--active' : ''}`}
+                onClick={() => handleSelect(c.code)}
+                onMouseEnter={() => setHighlightIdx(i)}
+                role="option"
+                aria-selected={c.code === value}
+              >
+                <span className="cp__item-flag">{getCountryFlag(c.code)}</span>
+                <span className="cp__item-name">
+                  {highlightName(c.name, query)}
+                </span>
+                <span className="cp__item-code">{c.code}</span>
+              </li>
+            ))
+          ) : (
+            <li className="cp__empty">
+              <SearchSmallIcon />
+              No countries match "{query}"
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+/* Highlight matching text in country name */
+function highlightName(name, query) {
+  if (!query.trim()) return name;
+  const lower = name.toLowerCase();
+  const q = query.toLowerCase().trim();
+  const idx = lower.indexOf(q);
+  if (idx === -1) return name;
+  return (
+    <>
+      {name.slice(0, idx)}
+      <mark className="cp__mark">{name.slice(idx, idx + q.length)}</mark>
+      {name.slice(idx + q.length)}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   CheckoutPage
+   ═══════════════════════════════════════════════ */
 const CheckoutPage = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
-  const [shipping, setShipping] = useState({ fullName: '', address: '', phone: '' });
+  const [shipping, setShipping] = useState({
+    fullName: '',
+    country: 'US',
+    address: '',
+    phoneCountry: 'US',
+    phone: '',
+  });
   const [orderReceipt, setOrderReceipt] = useState(null);
   const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e) => {
+  const phoneHint = getPhoneHint(shipping.phoneCountry);
+
+  const clearError = () => { if (error) setError(null); };
+
+  const handleInputChange = (e) => {
     setShipping(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    if (error) setError(null);
+    clearError();
+  };
+
+  const handleCountryChange = (code) => {
+    setShipping(prev => ({ ...prev, country: code, phoneCountry: code }));
+    clearError();
+  };
+
+  const handlePhoneCountryChange = (e) => {
+    setShipping(prev => ({ ...prev, phoneCountry: e.target.value, phone: '' }));
+    clearError();
+  };
+
+  const handlePhoneChange = (e) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setShipping(prev => ({ ...prev, phone: value }));
+    clearError();
   };
 
   const handleSubmit = async (e) => {
@@ -63,8 +267,26 @@ const CheckoutPage = () => {
     setError(null);
     setIsSubmitting(true);
 
+    const phoneData = COUNTRIES.find(c => c.code === shipping.phoneCountry);
+    if (phoneData) {
+      const [min, max] = phoneData.phoneDigits;
+      const digits = shipping.phone.replace(/\D/g, '');
+      if (digits.length < min || digits.length > max) {
+        setError(`Phone number must be between ${min} and ${max} digits for ${phoneData.name} (${phoneData.phoneCode}).`);
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    const countryData = COUNTRIES.find(c => c.code === shipping.country);
+    const fullAddress = countryData
+      ? `${countryData.name}, ${shipping.address}`
+      : shipping.address;
+    const fullPhone = phoneData
+      ? `${phoneData.phoneCode} ${shipping.phone}`
+      : shipping.phone;
+
     const token = localStorage.getItem('authToken');
-    const guestId = localStorage.getItem('guestId');
 
     try {
       const res = await fetch('http://localhost:5000/api/orders/checkout', {
@@ -75,9 +297,8 @@ const CheckoutPage = () => {
         },
         body: JSON.stringify({
           fullName: shipping.fullName,
-          shippingAddress: shipping.address,
-          contactPhone: shipping.phone,
-          guestId: token ? null : guestId,
+          shippingAddress: fullAddress,
+          contactPhone: fullPhone,
         }),
       });
 
@@ -101,14 +322,11 @@ const CheckoutPage = () => {
     return (
       <div className="checkout">
         <div className="checkout__success animate-bounce-in">
-          <div className="checkout__success-icon">
-            <CheckCircle />
-          </div>
+          <div className="checkout__success-icon"><CheckCircle /></div>
           <h1 className="checkout__success-title">Order Placed</h1>
           <p className="checkout__success-sub">
             Thank you for your purchase! Your order has been received and is being processed.
           </p>
-
           <div className="checkout__success-card">
             <div className="checkout__success-row">
               <span className="checkout__success-label">Order Reference</span>
@@ -123,36 +341,27 @@ const CheckoutPage = () => {
             <div className="checkout__success-row">
               <span className="checkout__success-label">Status</span>
               <span className="checkout__success-status">
-                <span className="checkout__success-dot" />
-                Processing
+                <span className="checkout__success-dot" />Processing
               </span>
             </div>
           </div>
-
-          <Link to="/" className="checkout__success-btn">
-            Return to Storefront
-          </Link>
+          <Link to="/" className="checkout__success-btn">Return to Storefront</Link>
         </div>
       </div>
     );
   }
 
-  /* ── Empty Cart Redirect ─────────────────── */
+  /* ── Empty Cart ─────────────────────────── */
   if (cartItems.length === 0) {
     return (
       <div className="checkout">
         <Link to="/" className="checkout__back">
-          <ArrowLeft />
-          <span>Back to Shop</span>
+          <ArrowLeft /><span>Back to Shop</span>
         </Link>
         <div className="empty-state">
-          <div className="empty-state__icon">
-            <TruckIcon />
-          </div>
+          <div className="empty-state__icon"><TruckIcon /></div>
           <h3 className="empty-state__title">Your cart is empty</h3>
-          <p className="empty-state__description">
-            Add some products before checking out.
-          </p>
+          <p className="empty-state__description">Add some products before checking out.</p>
           <Link to="/" className="cart-drawer__empty-cta">
             Browse Products
             <ArrowLeft style={{ transform: 'rotate(180deg)' }} />
@@ -166,71 +375,78 @@ const CheckoutPage = () => {
   return (
     <div className="checkout">
       <Link to="/" className="checkout__back animate-fade-in-down">
-        <ArrowLeft />
-        <span>Back to Shop</span>
+        <ArrowLeft /><span>Back to Shop</span>
       </Link>
 
       <h1 className="checkout__title animate-fade-in-up">Checkout</h1>
 
       <div className="checkout__grid">
-        {/* ── Form Column ─────────────────── */}
-        <form
-          className="checkout__form animate-fade-in-up delay-1"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          <h2 className="checkout__section-title">
-            <TruckIcon />
-            Shipping Details
-          </h2>
+        <form className="checkout__form animate-fade-in-up delay-1" onSubmit={handleSubmit} noValidate>
+          <h2 className="checkout__section-title"><TruckIcon />Shipping Details</h2>
 
           {error && (
             <div className="checkout__error" role="alert">
-              <AlertIcon />
-              <span>{error}</span>
+              <AlertIcon /><span>{error}</span>
             </div>
           )}
 
           <div className="checkout__field">
-            <label htmlFor="fullName">Full Name</label>
+            <label htmlFor="co-name">Full Name</label>
             <input
-              id="fullName"
-              type="text"
-              name="fullName"
-              value={shipping.fullName}
-              onChange={handleChange}
-              placeholder="Jane Doe"
-              required
-              autoComplete="name"
+              id="co-name" type="text" name="fullName"
+              value={shipping.fullName} onChange={handleInputChange}
+              placeholder="Jane Doe" required autoComplete="name"
+            />
+          </div>
+
+          {/* Searchable country picker */}
+          <div className="checkout__field">
+            <label>Country</label>
+            <CountryPicker
+              value={shipping.country}
+              onChange={handleCountryChange}
+              placeholder="Search country..."
             />
           </div>
 
           <div className="checkout__field">
-            <label htmlFor="address">Shipping Address</label>
+            <label htmlFor="co-address">Street Address</label>
             <input
-              id="address"
-              type="text"
-              name="address"
-              value={shipping.address}
-              onChange={handleChange}
-              placeholder="123 Main St, City, Country"
-              required
-              autoComplete="street-address"
+              id="co-address" type="text" name="address"
+              value={shipping.address} onChange={handleInputChange}
+              placeholder="123 Main St, Apt 4B, City, Postal Code"
+              required autoComplete="street-address"
             />
           </div>
 
           <div className="checkout__field">
-            <label htmlFor="phone">Contact Phone</label>
-            <input
-              id="phone"
-              type="tel"
-              name="phone"
-              value={shipping.phone}
-              onChange={handleChange}
-              placeholder="+1 (555) 123-4567"
-              required
-              autoComplete="tel"
-            />
+            <label>Contact Phone</label>
+            <div className="checkout__phone-row">
+              <div className="checkout__select-wrap checkout__select-wrap--code">
+                <select
+                  value={shipping.phoneCountry}
+                  onChange={handlePhoneCountryChange}
+                  aria-label="Phone country code"
+                >
+                  {COUNTRIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {getCountryFlag(c.code)} {c.phoneCode}
+                    </option>
+                  ))}
+                </select>
+                <span className="checkout__select-arrow" aria-hidden="true"><ChevronDown /></span>
+              </div>
+              <input
+                type="tel"
+                value={shipping.phone}
+                onChange={handlePhoneChange}
+                placeholder={getPhonePlaceholder(shipping.phoneCountry)}
+                required
+                inputMode="numeric"
+                autoComplete="tel-national"
+              />
+            </div>
+            {phoneHint && <span className="checkout__field-hint">{phoneHint}</span>}
           </div>
 
           <button
@@ -239,23 +455,15 @@ const CheckoutPage = () => {
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <>
-                <span className="checkout__spinner" />
-                Processing…
-              </>
+              <><span className="checkout__spinner" />Processing…</>
             ) : (
-              <>
-                <LockIcon />
-                Confirm & Pay ${cartTotal.toFixed(2)}
-              </>
+              <><LockIcon />Confirm & Pay ${cartTotal.toFixed(2)}</>
             )}
           </button>
         </form>
 
-        {/* ── Summary Column ─────────────── */}
         <div className="checkout__summary animate-fade-in-up delay-2">
           <h2 className="checkout__section-title">Order Summary</h2>
-
           <ul className="checkout__summary-list">
             {cartItems.map(item => (
               <li key={item.id} className="checkout__summary-item">
@@ -274,7 +482,6 @@ const CheckoutPage = () => {
               </li>
             ))}
           </ul>
-
           <div className="checkout__summary-total">
             <span>Total</span>
             <span>${cartTotal.toFixed(2)}</span>
