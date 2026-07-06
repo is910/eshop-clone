@@ -94,8 +94,93 @@
   margin-bottom: var(--space-5);
 }
 
-.checkout__field label {
-  margin-bottom: var(--space-2);
+/* ── Custom Select ─────────────────────────── */
+.checkout__select-wrap {
+  position: relative;
+}
+
+.checkout__select-wrap select {
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--space-10) 0 var(--space-4);
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.checkout__select-wrap select:hover {
+  border-color: var(--color-border);
+}
+
+.checkout__select-wrap select:focus {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.checkout__select-arrow {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+  transition: color var(--transition-fast);
+}
+
+.checkout__select-wrap:hover .checkout__select-arrow {
+  color: var(--color-text-secondary);
+}
+
+.checkout__select-wrap select:focus ~ .checkout__select-arrow {
+  color: var(--color-primary);
+}
+
+/* Phone code variant — narrower */
+.checkout__select-wrap--code {
+  width: 145px;
+  flex-shrink: 0;
+}
+
+.checkout__select-wrap--code select {
+  padding-right: var(--space-8);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.checkout__select-wrap--code .checkout__select-arrow {
+  right: 8px;
+}
+
+/* ── Phone Row ────────────────────────────── */
+.checkout__phone-row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.checkout__phone-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Field Hint ────────────────────────────── */
+.checkout__field-hint {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
 }
 
 /* ── Submit Button ─────────────────────────── */
@@ -384,6 +469,19 @@
     position: static;
     order: -1;
   }
+
+  .checkout__phone-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .checkout__select-wrap--code {
+    width: 100%;
+  }
+
+  .checkout__summary-header {
+    padding: var(--space-4) var(--space-4) var(--space-3);
+  }
 }
 
 @media (max-width: 480px) {
@@ -402,5 +500,214 @@
   .checkout__success-btn {
     width: 100%;
     padding: var(--space-4);
+  }
+}
+
+/* ============================================
+   COUNTRY PICKER — Searchable Combobox
+   ============================================ */
+
+/* ── Container ────────────────────────────── */
+.cp {
+  position: relative;
+}
+
+/* ── Input Wrap ───────────────────────────── */
+.cp__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 var(--space-4) 0 var(--space-3);
+  background-color: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.cp__input-wrap:hover {
+  border-color: var(--color-border);
+}
+
+.cp__input-wrap--open {
+  border-color: var(--color-border-focus);
+  box-shadow: var(--focus-ring);
+}
+
+/* Selected flag inside input */
+.cp__flag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-lg);
+  line-height: 1;
+  flex-shrink: 0;
+  margin-right: var(--space-1);
+}
+
+/* Input itself */
+.cp__input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+}
+
+.cp__input::placeholder {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+/* Chevron arrow */
+.cp__arrow {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+  transition:
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.cp__input-wrap:hover .cp__arrow {
+  color: var(--color-text-secondary);
+}
+
+.cp__arrow--open {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.cp__input-wrap--open .cp__arrow {
+  color: var(--color-primary);
+}
+
+/* ── Dropdown List ─────────────────────────── */
+.cp__list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  padding: var(--space-1);
+  animation: fadeInDown var(--duration-fast) var(--ease-out) both;
+}
+
+/* ── List Item ────────────────────────────── */
+.cp__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
+}
+
+.cp__item:hover,
+.cp__item--hl {
+  background-color: var(--color-primary-50);
+}
+
+.cp__item--active {
+  background-color: var(--color-primary-50);
+}
+
+.cp__item--active::after {
+  content: '';
+  margin-left: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.cp__item-flag {
+  font-size: var(--text-lg);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cp__item-name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp__item-code {
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  flex-shrink: 0;
+}
+
+/* Text highlight mark */
+.cp__mark {
+  background-color: var(--color-accent-light);
+  color: var(--color-primary-dark);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── Empty State ───────────────────────────── */
+.cp__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  justify-content: center;
+}
+
+.cp__empty svg {
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+/* ── Country Picker Responsive ─────────────── */
+@media (max-width: 480px) {
+  .cp__list {
+    max-height: 240px;
+  }
+
+  .cp__item {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .cp__item-flag {
+    font-size: var(--text-base);
+  }
+
+  .cp__item-code {
+    display: none;
+  }
+
+  .cp__item--active::after {
+    display: none;
   }
 }
