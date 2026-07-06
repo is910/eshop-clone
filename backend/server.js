@@ -157,31 +157,62 @@ app.post('/api/cart/add', async (req, res) => {
   }
 });
 
+// Cart 3: Remove item (deletes the row entirely from the database)
+app.post('/api/cart/remove', async (req, res) => {
+  try {
+    const { productId, guestId } = req.body;
+    const user = await extractUser(req);
+    const db = await getDB();
+
+    if (!user && !guestId) {
+      return res.status(400).json({ error: "Missing identity reference context." });
+    }
+
+    const userId = user?.id || null;
+    const gId = user ? null : guestId;
+
+    const result = await db.run(
+      'DELETE FROM cart_items WHERE (user_id IS ? AND guest_id IS ?) AND product_id = ?',
+      userId, gId, productId
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: "Item not found in cart." });
+    }
+
+    const updatedCart = await getHydratedCart(userId, gId);
+    return res.json({ success: true, cart: updatedCart });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Checkout: Process Order and Save to Database
 app.post('/api/orders/checkout', async (req, res) => {
   console.log('\n--- Incoming POST Request: /api/orders/checkout ---');
   try {
-    const { fullName, shippingAddress, contactPhone, guestId, authToken } = req.body;
+    const { fullName, shippingAddress, contactPhone } = req.body;
     
     if (!fullName || !shippingAddress || !contactPhone) {
       return res.status(400).json({ error: "All checkout shipping fields are strictly required." });
     }
 
+    // ── Auth Guard: Require authenticated user ──
     const user = await extractUser(req);
-    const userId = user?.id || null;
-    const gId = user ? null : guestId;
+    if (!user) {
+      return res.status(401).json({ error: "Authentication required to place an order. Please sign in." });
+    }
+    const userId = user.id;
 
     const db = await getDB();
 
-    // 1. Fetch current items inside this entity's cart layout
-    let cartQuery = `
+    // 1. Fetch current items inside this user's cart
+    const cartItems = await db.all(`
       SELECT c.product_id, c.quantity, p.name, p.price, p.stock 
       FROM cart_items c
       JOIN products p ON c.product_id = p.id
-    `;
-    const cartItems = userId 
-      ? await db.all(cartQuery + ' WHERE c.user_id = ?', userId)
-      : await db.all(cartQuery + ' WHERE c.guest_id = ?', gId);
+      WHERE c.user_id = ?
+    `, userId);
 
     if (!cartItems || cartItems.length === 0) {
       return res.status(400).json({ error: "Cannot checkout an empty shopping cart configuration." });
@@ -201,8 +232,8 @@ app.post('/api/orders/checkout', async (req, res) => {
 
     // 4. Begin Database Transaction Simulation (Sequential executions)
     const orderResult = await db.run(
-      'INSERT INTO orders (user_id, guest_id, full_name, shipping_address, contact_phone, total_amount) VALUES (?, ?, ?, ?, ?, ?)',
-      userId, gId, fullName, shippingAddress, contactPhone, orderTotal
+      'INSERT INTO orders (user_id, guest_id, full_name, shipping_address, contact_phone, total_amount) VALUES (?, NULL, ?, ?, ?, ?)',
+      userId, fullName, shippingAddress, contactPhone, orderTotal
     );
     const newOrderId = orderResult.lastID;
 
@@ -221,13 +252,9 @@ app.post('/api/orders/checkout', async (req, res) => {
     }
 
     // 5. Clear cart contents entirely upon successful transaction completion
-    if (userId) {
-      await db.run('DELETE FROM cart_items WHERE user_id = ?', userId);
-    } else {
-      await db.run('DELETE FROM cart_items WHERE guest_id = ?', gId);
-    }
+    await db.run('DELETE FROM cart_items WHERE user_id = ?', userId);
 
-    console.log(`[Checkout Server]: Successfully created Order #${newOrderId} for $${orderTotal.toFixed(2)}`);
+    console.log(`[Checkout Server]: Successfully created Order #${newOrderId} for user ${userId} — $${orderTotal.toFixed(2)}`);
     return res.json({ success: true, orderId: newOrderId, total: orderTotal });
 
   } catch (err) {
@@ -236,7 +263,7 @@ app.post('/api/orders/checkout', async (req, res) => {
   }
 });
 
-// Cart 3: Migrate items
+// Cart 4: Migrate items
 app.post('/api/cart/migrate', async (req, res) => {
   try {
     const { guestId, authToken } = req.body;
