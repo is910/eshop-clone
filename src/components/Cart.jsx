@@ -1,10 +1,12 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom'; // Import router bridge hook
 import './Cart.css';
 
 const Cart = ({ cartItems, isOpen, onClose, onRemoveFromCart }) => {
+  const navigate = useNavigate(); // Initialize navigation
   if (!isOpen) return null;
 
-  const total = cartItems.reduce((sum, item) => sum + item.price, 0);
+  const total = cartItems.reduce((sum, item) => sum + (item.price * (item.quantity || 1)), 0);
 
   return (
     <div className="cart-overlay">
@@ -23,14 +25,9 @@ const Cart = ({ cartItems, isOpen, onClose, onRemoveFromCart }) => {
                 <img src={item.image} alt={item.name} className="cart-item-image" />
                 <div className="cart-item-details">
                   <h4>{item.name}</h4>
-                  <p>${item.price.toFixed(2)}</p>
+                  <p>{item.quantity || 1} &times; ${item.price.toFixed(2)}</p>
                 </div>
-                <button 
-                  className="remove-btn"
-                  onClick={() => onRemoveFromCart(index)}
-                >
-                  Remove
-                </button>
+                <button className="remove-btn" onClick={() => onRemoveFromCart(index)}>Remove</button>
               </div>
             ))
           )}
@@ -39,7 +36,14 @@ const Cart = ({ cartItems, isOpen, onClose, onRemoveFromCart }) => {
         {cartItems.length > 0 && (
           <div className="cart-footer">
             <h3>Total: ${total.toFixed(2)}</h3>
-            <button className="checkout-btn">Checkout</button>
+            {/* Redirect user directly to dedicated checkout page and collapse sliding layout panels */}
+            <button 
+              className="checkout-btn" 
+              onClick={() => { navigate('/checkout'); onClose(); }}
+              style={{ width: '100%', padding: '0.75rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer', marginTop: '1rem' }}
+            >
+              Proceed to Checkout
+            </button>
           </div>
         )}
       </div>
