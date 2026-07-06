@@ -1,84 +1,150 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import Login from './Login';
+import Register from './Register';
+import './AuthPage.css';
+
+const ArrowLeft = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="19" y1="12" x2="5" y2="12"/>
+    <polyline points="12 19 5 12 12 5"/>
+  </svg>
+);
+
+const LockIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+    <path d="M7 11V7a5 5 0 0110 0v4"/>
+  </svg>
+);
+
+const TruckIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="3" width="15" height="13"/>
+    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+    <circle cx="5.5" cy="18.5" r="2.5"/>
+    <circle cx="18.5" cy="18.5" r="2.5"/>
+  </svg>
+);
+
+const RefreshIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 4 23 10 17 10"/>
+    <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+  </svg>
+);
 
 const AuthPage = ({ onAuthSuccess }) => {
-  const [isRegister, setIsRegister] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState(null);
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError(null);
-
-    const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login';
-    
-    try {
-      const res = await fetch(`http://localhost:5000${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        // Pass credentials back up to application state context
-        onAuthSuccess(data.authToken, data.role);
-        navigate('/'); // Redirect back to front product catalog page
-      } else {
-        setError(data.error || "Authentication operation failed.");
-      }
-    } catch (err) {
-      setError("Cannot reach backend server registry.");
-    }
-  };
+  const [activeTab, setActiveTab] = useState('login');
 
   return (
-    <div style={{ maxWidth: '400px', margin: '4rem auto', padding: '2rem', border: '1px solid #ddd', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-        {isRegister ? 'Create an Account' : 'Sign In'}
-      </h2>
-
-      {error && <div style={{ color: 'red', marginBottom: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>{error}</div>}
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Email / Username</label>
-          <input 
-            type="text" 
-            value={username} 
-            onChange={(e) => setUsername(e.target.value)} 
-            required 
-            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-          />
+    <div className="auth">
+      {/* ── Left Decorative Panel ─────────── */}
+      <div className="auth__panel">
+        <div className="auth__panel-bg" aria-hidden="true">
+          <div className="auth__panel-circle auth__panel-circle--1" />
+          <div className="auth__panel-circle auth__panel-circle--2" />
+          <div className="auth__panel-circle auth__panel-circle--3" />
         </div>
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Password</label>
-          <input 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)} 
-            required 
-            style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
-          />
+        <div className="auth__panel-grid" aria-hidden="true" />
+
+        <div className="auth__panel-content">
+          <Link to="/" className="auth__panel-logo">
+            <span className="auth__panel-logo-mark">V</span>
+            <span className="auth__panel-logo-text">Verdant</span>
+          </Link>
+
+          <p className="auth__panel-tagline">
+            Thoughtfully curated essentials for everyday living. Join us for a seamless shopping experience.
+          </p>
+
+          <div className="auth__panel-features">
+            <div className="auth__panel-feature">
+              <div className="auth__panel-feature-icon">
+                <LockIcon />
+              </div>
+              <div>
+                <span className="auth__panel-feature-title">Secure Checkout</span>
+                <span className="auth__panel-feature-desc">Your data is always protected</span>
+              </div>
+            </div>
+
+            <div className="auth__panel-feature">
+              <div className="auth__panel-feature-icon">
+                <TruckIcon />
+              </div>
+              <div>
+                <span className="auth__panel-feature-title">Fast Shipping</span>
+                <span className="auth__panel-feature-desc">Quick delivery to your door</span>
+              </div>
+            </div>
+
+            <div className="auth__panel-feature">
+              <div className="auth__panel-feature-icon">
+                <RefreshIcon />
+              </div>
+              <div>
+                <span className="auth__panel-feature-title">Easy Returns</span>
+                <span className="auth__panel-feature-desc">Hassle-free return process</span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <button type="submit" style={{ width: '100%', padding: '0.75rem', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '1rem', fontWeight: 'bold', cursor: 'pointer' }}>
-          {isRegister ? 'Register Account' : 'Login'}
-        </button>
-      </form>
+      {/* ── Right Form Panel ──────────────── */}
+      <div className="auth__form-panel">
+        <div className="auth__form-inner">
+          {/* Mobile-only brand */}
+          <Link to="/" className="auth__mobile-logo">
+            <span className="auth__panel-logo-mark">V</span>
+            <span className="auth__panel-logo-text">Verdant</span>
+          </Link>
 
-      <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem' }}>
-        {isRegister ? "Already have an account? " : "New to our store? "}
-        <button 
-          onClick={() => { setIsRegister(!isRegister); setError(null); }} 
-          style={{ background: 'none', border: 'none', color: '#007bff', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
-        >
-          {isRegister ? 'Sign In here' : 'Register here'}
-        </button>
+          <Link to="/" className="auth__back">
+            <ArrowLeft />
+            <span>Back to Shop</span>
+          </Link>
+
+          {/* Tab Switcher */}
+          <div className="auth__tabs" role="tablist">
+            <div
+              className={`auth__tabs-indicator ${activeTab === 'register' ? 'auth__tabs-indicator--right' : ''}`}
+              aria-hidden="true"
+            />
+            <button
+              className={`auth__tab ${activeTab === 'login' ? 'auth__tab--active' : ''}`}
+              onClick={() => setActiveTab('login')}
+              role="tab"
+              aria-selected={activeTab === 'login'}
+            >
+              Sign In
+            </button>
+            <button
+              className={`auth__tab ${activeTab === 'register' ? 'auth__tab--active' : ''}`}
+              onClick={() => setActiveTab('register')}
+              role="tab"
+              aria-selected={activeTab === 'register'}
+            >
+              Register
+            </button>
+          </div>
+
+          {/* Sliding Form Content — both always mounted */}
+          <div className="auth__form-content">
+            <div className={`auth__slide ${activeTab === 'login' ? 'auth__slide--active' : 'auth__slide--left'}`}>
+              <Login onAuthSuccess={onAuthSuccess} />
+            </div>
+            <div className={`auth__slide ${activeTab === 'register' ? 'auth__slide--active' : 'auth__slide--right'}`}>
+              <Register onAuthSuccess={onAuthSuccess} />
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
