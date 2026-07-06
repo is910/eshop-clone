@@ -59,10 +59,29 @@ export function CartProvider({ children }) {
     }
   }, [getIds]);
 
-  /* ── Remove item (local-only — no backend DELETE endpoint exists) ── */
-  const removeFromCart = useCallback((productId) => {
+  /* ── Remove item (calls backend to delete the DB row) ── */
+  const removeFromCart = useCallback(async (productId) => {
+    try {
+      const { authToken, guestId } = getIds();
+      await fetch('http://localhost:5000/api/cart/remove', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: authToken } : {}),
+        },
+        body: JSON.stringify({
+          productId,
+          guestId: authToken ? null : guestId,
+        }),
+      });
+    } catch (err) {
+      console.error('[CartContext] remove error:', err);
+    }
+
+    // Always update local state immediately for responsive UI,
+    // regardless of whether the API call succeeded
     setCartItems(prev => prev.filter(item => item.id !== productId));
-  }, []);
+  }, [getIds]);
 
   /* ── Clear entirely ────────────────────── */
   const clearCart = useCallback(() => setCartItems([]), []);
