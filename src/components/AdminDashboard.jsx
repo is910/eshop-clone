@@ -3,7 +3,8 @@ import './AdminDashboard.css';
 
 const AdminDashboard = () => {
   const [products, setProducts] = useState([]);
-  const [form, setForm] = useState({ id: '', name: '', price: '', category: '', stock: '', description: '', imagePath: '' });
+  const [form, setForm] = useState({ id: '', name: '', price: '', category: '', stock: '', description: '' });
+  const [selectedFile, setSelectedFile] = useState(null); // State to hold selected binary asset
   const [isEditing, setIsEditing] = useState(false);
 
   const fetchCatalog = () => {
@@ -15,6 +16,7 @@ const AdminDashboard = () => {
   useEffect(() => { fetchCatalog(); }, []);
 
   const handleInputChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+  const handleFileChange = (e) => setSelectedFile(e.target.files[0]); // Extract file payload
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -22,14 +24,32 @@ const AdminDashboard = () => {
     const method = isEditing ? 'PUT' : 'POST';
     const url = isEditing ? `http://localhost:5000/api/products/${form.id}` : 'http://localhost:5000/api/products';
 
+    // 🌟 Construct standard multi-part boundary transmission
+    const formData = new FormData();
+    formData.append('name', form.name);
+    formData.append('price', form.price);
+    formData.append('category', form.category);
+    formData.append('stock', form.stock);
+    formData.append('description', form.description);
+    formData.append('authToken', token); // Inject authorization reference directly into payload
+    
+    if (selectedFile) {
+      formData.append('productImage', selectedFile);
+    }
+
     const res = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json', 'Authorization': token },
-      body: JSON.stringify(form)
+      headers: { 'Authorization': token }, // Keep header authentication intact
+      body: formData // Send the FormData directly (no JSON.stringify or Content-Type headers)
     });
 
     if (res.ok) {
-      setForm({ id: '', name: '', price: '', category: '', stock: '', description: '', imagePath: '' });
+      setForm({ id: '', name: '', price: '', category: '', stock: '', description: '' });
+      setSelectedFile(null);
+      // Reset standard input elements
+      const fileInput = document.getElementById('productImageInput');
+      if (fileInput) fileInput.value = '';
+      
       setIsEditing(false);
       fetchCatalog();
     } else {
@@ -39,17 +59,8 @@ const AdminDashboard = () => {
 
   const startEdit = (prod) => {
     setIsEditing(true);
-    setForm({ id: prod.id, name: prod.name, price: prod.price, category: prod.category, stock: prod.stock, description: '', imagePath: '' });
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this product?")) return;
-    const token = localStorage.getItem('authToken');
-    const res = await fetch(`http://localhost:5000/api/products/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': token }
-    });
-    if (res.ok) fetchCatalog();
+    setForm({ id: prod.id, name: prod.name, price: prod.price, category: prod.category, stock: prod.stock, description: prod.description || '' });
+    setSelectedFile(null);
   };
 
   return (
@@ -63,8 +74,25 @@ const AdminDashboard = () => {
         <input type="text" name="category" placeholder="Category" value={form.category} onChange={handleInputChange} required style={{ display: 'block', width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
         <input type="number" name="stock" placeholder="Stock Quantity" value={form.stock} onChange={handleInputChange} required style={{ display: 'block', width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
         <textarea name="description" placeholder="Description" value={form.description} onChange={handleInputChange} style={{ display: 'block', width: '100%', marginBottom: '0.5rem', padding: '0.5rem' }} />
-        <button type="submit" style={{ padding: '0.5rem 1rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px' }}>Save Product</button>
-        {isEditing && <button type="button" onClick={() => { setIsEditing(false); setForm({ id: '', name: '', price: '', category: '', stock: '', description: '', imagePath: '' }); }} style={{ marginLeft: '10px' }}>Cancel</button>}
+        
+        {/* Dynamic File Uploader input element */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontWeight: 'bold', marginBottom: '0.25rem' }}>
+            Product Image File {isEditing && '(Leave blank to retain current)'}
+          </label>
+          <input 
+            id="productImageInput"
+            type="file" 
+            accept="image/*" 
+            onChange={handleFileChange} 
+            style={{ display: 'block' }}
+          />
+        </div>
+
+        <button type="submit" style={{ padding: '0.5rem 1rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+          Save Product
+        </button>
+        {isEditing && <button type="button" onClick={() => { setIsEditing(false); setForm({ id: '', name: '', price: '', category: '', stock: '', description: '' }); setSelectedFile(null); }} style={{ marginLeft: '10px' }}>Cancel</button>}
       </form>
 
       <h3>Product Inventory</h3>
@@ -87,7 +115,15 @@ const AdminDashboard = () => {
               <td>{p.stock} units</td>
               <td>
                 <button onClick={() => startEdit(p)} style={{ marginRight: '5px' }}>Edit</button>
-                <button onClick={() => handleDelete(p.id)} style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: '3px', padding: '2px 6px' }}>Delete</button>
+                <button onClick={() => {
+                  if (window.confirm("Are you sure you want to delete this product?")) {
+                    const token = localStorage.getItem('authToken');
+                    fetch(`http://localhost:5000/api/products/${p.id}`, {
+                      method: 'DELETE',
+                      headers: { 'Authorization': token }
+                    }).then(res => { if (res.ok) fetchCatalog(); });
+                  }
+                }} style={{ background: '#dc3545', color: '#fff', border: 'none', borderRadius: '3px', padding: '2px 6px', cursor: 'pointer' }}>Delete</button>
               </td>
             </tr>
           ))}

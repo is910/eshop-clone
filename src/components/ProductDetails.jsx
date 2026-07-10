@@ -202,6 +202,10 @@ const ProductDetails = ({ onAddToCart }) => {
               alt={product.name}
               className={`pd__image ${imageLoaded ? 'pd__image--loaded' : ''}`}
               onLoad={() => setImageLoaded(true)}
+              onError={(e) => {
+                e.target.onerror = null; // Prevent infinite fallback loops if the placeholder is also missing
+                e.target.src = 'http://localhost:5000/images/default-placeholder.jpg';
+              }}
             />
             <span className="pd__category">{product.category}</span>
           </div>

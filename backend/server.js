@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { getDB } from './data/db.js';
+import multer from 'multer'; // 📦 Import Multer
 
 const app = express();
 const PORT = 5000;
@@ -12,6 +14,26 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Ensure the storage folder exists cleanly on startup
+const uploadDir = path.join(__dirname, 'public', 'images');
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// ⚙️ Multer Disk Storage Engine Configuration
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir); // Save to public/images
+  },
+  filename: function (req, file, cb) {
+    // Generate clean names: timestamp-original-filename
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ storage: storage });
+
 // Middleware to extract user and check roles from real SQLite records
 async function extractUser(req) {
   const token = req.headers['authorization'] || (req.body && req.body.authToken);
@@ -19,7 +41,7 @@ async function extractUser(req) {
 
   const db = await getDB();
   const user = await db.get('SELECT id, role FROM users WHERE token = ?', token);
-  return user || null; // Returns { id, role } or null
+  return user || null;
 }
 
 // Security Middleware: Requires Admin Privileges
@@ -87,13 +109,9 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     const db = await getDB();
-    
-    // Generate a quick random token string for session lookup
     const generatedToken = `token_${Math.random().toString(36).substring(2, 15)}`;
-    // Assign a default client ID
     const newUserId = `user_${Math.random().toString(36).substring(2, 7)}`;
 
-    // Insert user into SQLite database with standard 'customer' role
     await db.run(
       'INSERT INTO users (id, username, password, role, token) VALUES (?, ?, ?, "customer", ?)',
       newUserId, username, password, generatedToken
@@ -135,7 +153,6 @@ app.post('/api/cart/add', async (req, res) => {
     const userId = user?.id || null;
     const gId = user ? null : guestId;
 
-    // Check if item already exists in this cart session
     const existing = await db.get(
       'SELECT id, quantity FROM cart_items WHERE (user_id IS ? AND guest_id IS ?) AND product_id = ?',
       userId, gId, productId
@@ -157,7 +174,7 @@ app.post('/api/cart/add', async (req, res) => {
   }
 });
 
-// Cart 3: Remove item (deletes the row entirely from the database)
+// Cart 3: Remove item
 app.post('/api/cart/remove', async (req, res) => {
   try {
     const { productId, guestId } = req.body;
@@ -187,7 +204,7 @@ app.post('/api/cart/remove', async (req, res) => {
   }
 });
 
-// Checkout: Process Order and Save to Database
+// Checkout: Process Order
 app.post('/api/orders/checkout', async (req, res) => {
   console.log('\n--- Incoming POST Request: /api/orders/checkout ---');
   try {
@@ -197,16 +214,13 @@ app.post('/api/orders/checkout', async (req, res) => {
       return res.status(400).json({ error: "All checkout shipping fields are strictly required." });
     }
 
-    // ── Auth Guard: Require authenticated user ──
     const user = await extractUser(req);
     if (!user) {
       return res.status(401).json({ error: "Authentication required to place an order. Please sign in." });
     }
     const userId = user.id;
-
     const db = await getDB();
 
-    // 1. Fetch current items inside this user's cart
     const cartItems = await db.all(`
       SELECT c.product_id, c.quantity, p.name, p.price, p.stock 
       FROM cart_items c
@@ -218,7 +232,6 @@ app.post('/api/orders/checkout', async (req, res) => {
       return res.status(400).json({ error: "Cannot checkout an empty shopping cart configuration." });
     }
 
-    // 2. Stock Verification Safety Check
     for (const item of cartItems) {
       if (item.stock < item.quantity) {
         return res.status(409).json({ 
@@ -227,10 +240,8 @@ app.post('/api/orders/checkout', async (req, res) => {
       }
     }
 
-    // 3. Compute running totals cleanly
     const orderTotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    // 4. Begin Database Transaction Simulation (Sequential executions)
     const orderResult = await db.run(
       'INSERT INTO orders (user_id, guest_id, full_name, shipping_address, contact_phone, total_amount) VALUES (?, NULL, ?, ?, ?, ?)',
       userId, fullName, shippingAddress, contactPhone, orderTotal
@@ -238,20 +249,16 @@ app.post('/api/orders/checkout', async (req, res) => {
     const newOrderId = orderResult.lastID;
 
     for (const item of cartItems) {
-      // Save item purchase snapshots
       await db.run(
         'INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)',
         newOrderId, item.product_id, item.quantity, item.price
       );
-
-      // Decrement the active product stock values inside your inventory tables
       await db.run(
         'UPDATE products SET stock = stock - ? WHERE id = ?',
         item.quantity, item.product_id
       );
     }
 
-    // 5. Clear cart contents entirely upon successful transaction completion
     await db.run('DELETE FROM cart_items WHERE user_id = ?', userId);
 
     console.log(`[Checkout Server]: Successfully created Order #${newOrderId} for user ${userId} — $${orderTotal.toFixed(2)}`);
@@ -283,7 +290,6 @@ app.post('/api/cart/migrate', async (req, res) => {
       }
     }
 
-    // Delete guest cart items
     await db.run('DELETE FROM cart_items WHERE guest_id = ?', guestId);
 
     const updatedCart = await getHydratedCart(user.id, null);
@@ -328,14 +334,21 @@ app.get('/api/products/:id', async (req, res) => {
   }
 });
 
-// Admin CRUD 1: Add Product
-app.post('/api/products', requireAdmin, async (req, res) => {
+// Admin CRUD 1: Add Product (Upgraded to handle dynamic file streams)
+app.post('/api/products', upload.single('productImage'), async (req, res, next) => {
+  // Execute admin validation manually to accommodate multipart parsing sequences cleanly
+  await requireAdmin(req, res, next);
+}, async (req, res) => {
   try {
-    const { name, price, category, stock, description, imagePath } = req.body;
+    const { name, price, category, stock, description } = req.body;
+    
+    // Check if an actual image was uploaded, otherwise default to fallback path
+    const imagePath = req.file ? `/images/${req.file.filename}` : '/images/default-placeholder.jpg';
+    
     const db = await getDB();
     const result = await db.run(
       'INSERT INTO products (name, price, category, stock, description, image_path) VALUES (?, ?, ?, ?, ?, ?)',
-      name, price, category, stock, description, imagePath || '/images/tshirt.jpg'
+      name, price, category, stock, description, imagePath
     );
     return res.json({ success: true, id: result.lastID });
   } catch (err) {
@@ -343,15 +356,29 @@ app.post('/api/products', requireAdmin, async (req, res) => {
   }
 });
 
-// Admin CRUD 2: Edit Product
-app.put('/api/products/:id', requireAdmin, async (req, res) => {
+// Admin CRUD 2: Edit Product (Supports swapping existing images out dynamically)
+app.put('/api/products/:id', upload.single('productImage'), async (req, res, next) => {
+  await requireAdmin(req, res, next);
+}, async (req, res) => {
   try {
-    const { name, price, category, stock, description, imagePath } = req.body;
+    const { name, price, category, stock, description } = req.body;
     const db = await getDB();
-    await db.run(
-      'UPDATE products SET name = ?, price = ?, category = ?, stock = ?, description = ?, image_path = ? WHERE id = ?',
-      name, price, category, stock, description, imagePath, req.params.id
-    );
+
+    let result;
+    if (req.file) {
+      // If a new image file is provided, update all metadata including the path field
+      const imagePath = `/images/${req.file.filename}`;
+      result = await db.run(
+        'UPDATE products SET name = ?, price = ?, category = ?, stock = ?, description = ?, image_path = ? WHERE id = ?',
+        name, price, category, stock, description, imagePath, req.params.id
+      );
+    } else {
+      // Otherwise keep the existing image intact without overwriting it
+      result = await db.run(
+        'UPDATE products SET name = ?, price = ?, category = ?, stock = ?, description = ? WHERE id = ?',
+        name, price, category, stock, description, req.params.id
+      );
+    }
     return res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
