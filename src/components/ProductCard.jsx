@@ -53,12 +53,19 @@ const ProductCard = ({ product, onAddToCart, index = 0 }) => {
       <Link to={`/product/${product.id}`} className="product-card__image-link">
         <div className="product-card__image-wrap">
           {!imageLoaded && <div className="skeleton skeleton-image" />}
-          <img
-            src={product.image}
-            alt={product.name}
-            className={`product-card__image ${imageLoaded ? 'product-card__image--loaded' : ''}`}
-            onLoad={() => setImageLoaded(true)}
+          {/* 📄 Inside src/components/ProductCard.jsx */}
+
+          <img 
+            src={product.image} 
+            alt={product.name} 
+            className={`product-card__image ${imageLoaded ? 'product-card__image--loaded' : ''}`} // Added conditional visibility class if your CSS uses it
             loading="lazy"
+            onLoad={() => setImageLoaded(true)} // ✨ FIX: Turns off the skeleton placeholder when image finishes transferring
+            onError={(e) => {
+              e.target.onerror = null; 
+              e.target.src = 'http://localhost:5000/images/default-placeholder.jpg'; 
+              setImageLoaded(true); // Ensure we hide the skeleton if a broken link falls back
+            }}
           />
 
           {/* Hover overlay */}

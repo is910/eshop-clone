@@ -8,6 +8,52 @@ const dbPath = path.join(__dirname, '..', 'ecommerce.db');
 
 let dbConnection = null;
 
+// 📝 THIS IS YOUR MASTER CATALOG LIST. 
+// You can add, remove, or modify items here whenever you want!
+const initialProducts = [
+  {
+    name: "Classic White T-Shirt",
+    price: 19.99,
+    category: "Apparel",
+    stock: 25,
+    image_path: "/images/tshirt.jpg",
+    description: "A comfortable classic white t-shirt made from 100% organic cotton."
+  },
+  {
+    name: "Denim Jeans",
+    price: 49.99,
+    category: "Apparel",
+    stock: 14,
+    image_path: "/images/jeans.jpg",
+    description: "High-quality denim jeans with a comfortable straight-leg fit."
+  },
+  {
+    name: "Running Sneakers",
+    price: 89.99,
+    category: "Footwear",
+    stock: 8,
+    image_path: "/images/sneakers.jpg",
+    description: "Lightweight running sneakers with responsive cushioning."
+  },
+  // ✨ Simply add your 4th, 5th, or 6th items here when you're ready:
+  {
+    name: "Leather Wallet",
+    price: 29.99,
+    category: "Accessories",
+    stock: 50,
+    image_path: "/images/wallet.jpg",
+    description: "Genuine leather bi-fold wallet with RFID protection."
+  },
+  {
+    name: "Leather Jacket",
+    price: 29.99,
+    category: "Apparel",
+    stock: 50,
+    image_path: "/images/jacket.jpg",
+    description: "Genuine leather bi-fold wallet with RFID protection."
+  }
+];
+
 export async function getDB() {
   if (dbConnection) return dbConnection;
 
@@ -31,7 +77,7 @@ export async function getDB() {
 
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
+      name TEXT UNIQUE NOT NULL, -- 🔑 CHANGE 1: Added UNIQUE constraint here
       price REAL NOT NULL,
       category TEXT NOT NULL,
       stock INTEGER NOT NULL DEFAULT 0,
@@ -67,25 +113,22 @@ export async function getDB() {
       quantity INTEGER NOT NULL,
       price_at_purchase REAL NOT NULL,
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id)
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
   `);
 
-  // Seed default items if the catalog is empty
-  const productCount = await dbConnection.get('SELECT COUNT(*) as count FROM products');
-  if (productCount.count === 0) {
+  // 🔄 CHANGE 2: Smart loop that runs on every single startup.
+  // It inserts new entries but avoids throwing errors for duplicates.
+  for (const prod of initialProducts) {
     await dbConnection.run(`
-      INSERT INTO products (name, price, category, stock, image_path, description) VALUES
-      ('Classic White T-Shirt', 19.99, 'Apparel', 25, '/images/tshirt.jpg', 'A comfortable classic white t-shirt made from 100% organic cotton.'),
-      ('Denim Jeans', 49.99, 'Apparel', 14, '/images/jeans.jpg', 'High-quality denim jeans with a comfortable straight-leg fit.'),
-      ('Running Sneakers', 89.99, 'Footwear', 8, '/images/sneakers.jpg', 'Lightweight running sneakers with responsive cushioning.');
-    `);
+      INSERT OR IGNORE INTO products (name, price, category, stock, image_path, description)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, prod.name, prod.price, prod.category, prod.stock, prod.image_path, prod.description);
   }
 
   // Seed default structural profiles if empty
   const userCount = await dbConnection.get('SELECT COUNT(*) as count FROM users');
   if (userCount.count === 0) {
-    // In production, use bcrypt to hash these passwords. For your school project, we store strings directly.
     await dbConnection.run(`
       INSERT INTO users (id, username, password, role, token) VALUES
       ('user_customer_1', 'customer@eshop.com', 'pass123', 'customer', 'token_customer_xyz'),
